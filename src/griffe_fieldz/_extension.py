@@ -127,8 +127,14 @@ class FieldzExtension(Extension):
 def _to_annotation(type_: Any, docstring: Docstring) -> str | Expr | None:
     """Create griffe annotation for a type."""
     if type_:
+        # Note: type aliases used in fields come back as "TypeAliasType" from this method
+        attempted_display = display_as_type(type_, modern_union=True)
+        if "TypeAliasType" in attempted_display:
+            # we will just use the repr for now to give us the type
+            # Note: we aren't supporting the modern_union=False case yet
+            attempted_display = repr(type_)
         return parse_docstring_annotation(
-            display_as_type(type_, modern_union=True), docstring
+            attempted_display, docstring
         )
     return None
 

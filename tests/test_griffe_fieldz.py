@@ -28,6 +28,15 @@ def test_extension() -> None:
     assert p0.description == "The x field."
     assert p0.value == "1"
 
+def test_valid_type_alias() -> None:
+    loader = GriffeLoader(extensions=Extensions(FieldzExtension()))
+    fake_mod = loader.load("tests.fake_module")
+    sections = fake_mod["WithTypeAlias"].docstring.parsed
+    assert len(sections) == 2
+    sec1 = sections[1]
+    p0 = sec1.value[0]
+    assert p0.annotation.name == "ExampleAlias"
+
 
 @pytest.mark.parametrize("remove", [True, False])
 @pytest.mark.parametrize(

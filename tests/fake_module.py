@@ -1,5 +1,12 @@
 from dataclasses import dataclass, field
 
+type ExampleAlias = int | str
+
+
+@dataclass
+class WithTypeAlias:
+    x: ExampleAlias
+
 
 @dataclass
 class SomeDataclass:
