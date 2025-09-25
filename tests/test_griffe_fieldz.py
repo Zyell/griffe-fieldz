@@ -40,6 +40,8 @@ def test_valid_type_alias() -> None:
     assert p1.annotation.name == "NewInt"
     p2 = sec1.value[2]
     assert p2.annotation.name == "T"
+    p3 = sec1.value[3]
+    assert str(p3.annotation) == "dict[str, ExampleAlias]"
 
 
 @pytest.mark.parametrize("remove", [True, False])

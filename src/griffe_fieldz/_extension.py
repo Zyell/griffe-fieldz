@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Literal, TypedDict, TypeVar, ca
 
 import fieldz
 import typing_extensions
-from fieldz._repr import display_as_type, typing_base, WithArgsTypes, origin_is_literal, origin_is_union
+from fieldz._repr import typing_base, WithArgsTypes, origin_is_literal, origin_is_union
 from griffe import (
     Attribute,
     Class,
@@ -154,7 +154,7 @@ def _display_as_type(obj: Any, *, modern_union: bool = False) -> str:
         arg_reprs = [repr(arg) for arg in typing_extensions.get_args(obj)]
         return f"Literal[{', '.join(arg_reprs)}]"
     elif origin_is_union(origin):
-        args = [display_as_type(x) for x in typing_extensions.get_args(obj)]
+        args = [_display_as_type(x) for x in typing_extensions.get_args(obj)]
         if modern_union:
             return " | ".join(args)
         if len(args) == 2 and "None" in args:
@@ -162,7 +162,7 @@ def _display_as_type(obj: Any, *, modern_union: bool = False) -> str:
             return f"Optional[{args[0]}]"
         return f"Union[{', '.join(args)}]"
     elif isinstance(obj, WithArgsTypes):
-        argstr = ", ".join(map(display_as_type, typing_extensions.get_args(obj)))
+        argstr = ", ".join(map(_display_as_type, typing_extensions.get_args(obj)))
         return f"{obj.__qualname__}[{argstr}]"
     elif isinstance(obj, type):
         return obj.__qualname__

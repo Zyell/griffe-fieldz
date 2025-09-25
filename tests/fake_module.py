@@ -13,6 +13,7 @@ class WithTypeAssortedGenericTypes[T]:
     x: ExampleAlias
     y: NewInt
     z: T
+    a: dict[str, ExampleAlias]
 
 
 @dataclass
