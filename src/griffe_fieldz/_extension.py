@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import inspect
 import textwrap
+import types
+import typing
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Iterable, Literal, TypedDict, TypeVar, cast
 
 import fieldz
-from fieldz._repr import display_as_type
+import typing_extensions
+from fieldz._repr import display_as_type, typing_base, WithArgsTypes, origin_is_literal, origin_is_union
 from griffe import (
     Attribute,
     Class,
@@ -42,13 +45,13 @@ class FieldzExtension(Extension):
     """Griffe extension that injects field information for dataclass-likes."""
 
     def __init__(
-        self,
-        object_paths: list[str] | None = None,
-        include_private: bool = False,
-        include_inherited: bool = False,
-        add_fields_to: AddFieldsTo = "docstring-parameters",
-        remove_fields_from_members: bool = False,
-        **kwargs: Any,
+            self,
+            object_paths: list[str] | None = None,
+            include_private: bool = False,
+            include_inherited: bool = False,
+            add_fields_to: AddFieldsTo = "docstring-parameters",
+            remove_fields_from_members: bool = False,
+            **kwargs: Any,
     ) -> None:
         self.object_paths = object_paths
         self._kwargs = kwargs
@@ -61,9 +64,9 @@ class FieldzExtension(Extension):
 
         self.remove_fields_from_members = remove_fields_from_members
         if add_fields_to not in (
-            "docstring-parameters",
-            "docstring-attributes",
-            "class-attributes",
+                "docstring-parameters",
+                "docstring-attributes",
+                "class-attributes",
         ):  # pragma: no cover
             logger.error(
                 "'add_fields_to' must be one of {'docstring-parameters', "
@@ -75,12 +78,12 @@ class FieldzExtension(Extension):
         self.add_fields_to: AddFieldsTo = add_fields_to
 
     def on_class_members(
-        self,
-        *,
-        node: ast.AST | ObjectNode,
-        cls: Class,
-        agent: Visitor | Inspector,
-        **kwargs: Any,
+            self,
+            *,
+            node: ast.AST | ObjectNode,
+            cls: Class,
+            agent: Visitor | Inspector,
+            **kwargs: Any,
     ) -> None:
         if isinstance(node, ObjectNode):
             return  # skip runtime objects
@@ -124,17 +127,54 @@ class FieldzExtension(Extension):
         )
 
 
+def _display_as_type(obj: Any, *, modern_union: bool = False) -> str:
+    """Pretty representation of a type.
+
+    Should be as close as possible to the original type definition string.
+    Takes some logic from `typing._type_repr`.
+    """
+    if isinstance(obj, types.FunctionType):
+        return obj.__name__
+    elif obj is ...:
+        return "..."
+    elif obj in (None, type(None)):
+        return "None"
+
+    if not isinstance(obj, (typing_base, WithArgsTypes, type, typing.TypeAliasType, typing.TypeVar, typing.NewType)):
+        obj = obj.__class__
+
+    if isinstance(obj, (typing.NewType, typing.TypeVar)):
+        # TypeVar repr includes a prepended ~ and NewType repr includes the module name prepended,
+        # so we use __name__ to get a clean name
+        return obj.__name__
+
+    origin = typing_extensions.get_origin(obj)
+    if origin_is_literal(origin):
+        # For Literal types, represent the actual values, not their types
+        arg_reprs = [repr(arg) for arg in typing_extensions.get_args(obj)]
+        return f"Literal[{', '.join(arg_reprs)}]"
+    elif origin_is_union(origin):
+        args = [display_as_type(x) for x in typing_extensions.get_args(obj)]
+        if modern_union:
+            return " | ".join(args)
+        if len(args) == 2 and "None" in args:
+            args.remove("None")
+            return f"Optional[{args[0]}]"
+        return f"Union[{', '.join(args)}]"
+    elif isinstance(obj, WithArgsTypes):
+        argstr = ", ".join(map(display_as_type, typing_extensions.get_args(obj)))
+        return f"{obj.__qualname__}[{argstr}]"
+    elif isinstance(obj, type):
+        return obj.__qualname__
+    else:  # pragma: no cover
+        return repr(obj).replace("typing.", "").replace("typing_extensions.", "")
+
+
 def _to_annotation(type_: Any, docstring: Docstring) -> str | Expr | None:
     """Create griffe annotation for a type."""
     if type_:
-        # Note: type aliases used in fields come back as "TypeAliasType" from this method
-        attempted_display = display_as_type(type_, modern_union=True)
-        if "TypeAliasType" in attempted_display:
-            # we will just use the repr for now to give us the type
-            # Note: we aren't supporting the modern_union=False case yet
-            attempted_display = repr(type_)
         return parse_docstring_annotation(
-            attempted_display, docstring
+            _display_as_type(type_, modern_union=True), docstring
         )
     return None
 
@@ -171,11 +211,11 @@ class DocstringNamedElementKwargs(TypedDict):
 
 
 def _unify_fields(
-    fields: Iterable[fieldz.Field],
-    griffe_obj: Object,
-    include_private: bool,
-    add_fields_to: AddFieldsTo,
-    remove_fields_from_members: bool,
+        fields: Iterable[fieldz.Field],
+        griffe_obj: Object,
+        include_private: bool,
+        add_fields_to: AddFieldsTo,
+        remove_fields_from_members: bool,
 ) -> None:
     docstring = cast("Docstring", griffe_obj.docstring)
     sections = docstring.parsed
@@ -219,7 +259,7 @@ def _unify_fields(
 
 
 def _merged_kwargs(
-    field: fieldz.Field, docstring: Docstring, griffe_obj: Object
+        field: fieldz.Field, docstring: Docstring, griffe_obj: Object
 ) -> DocstringNamedElementKwargs:
     desc = field.description or field.metadata.get("description", "") or ""
     if not desc and (doc := getattr(field.default_factory, "__doc__", None)):
@@ -249,7 +289,7 @@ def _get_section(sections: list[DocstringSection], cls: type[T]) -> T | None:
 
 
 def _add_if_missing(
-    sections: list[DocstringSection], item: DocstringParameter | DocstringAttribute
+        sections: list[DocstringSection], item: DocstringParameter | DocstringAttribute
 ) -> None:
     section: DocstringSectionParameters | DocstringSectionAttributes | None
     if isinstance(item, DocstringParameter):

@@ -1,11 +1,18 @@
 from dataclasses import dataclass, field
+from typing import TypeVar, NewType
 
 type ExampleAlias = int | str
 
+T = TypeVar("T")
+
+NewInt = NewType("NewInt", int)
+
 
 @dataclass
-class WithTypeAlias:
+class WithTypeAssortedGenericTypes[T]:
     x: ExampleAlias
+    y: NewInt
+    z: T
 
 
 @dataclass
